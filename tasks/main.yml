@@ -1,0 +1,101 @@
+---
+- name: install dependencies for rbenv
+  yum: name={{ item }} state=latest
+  with_items:
+    - gcc
+    - gcc-c++
+    - make
+    - bzip2
+    - libyaml-devel
+    - libffi-devel
+    - zlib-devel
+    - openssl-devel
+    - readline-devel
+    - gdbm-devel
+    - ncurses-devel
+
+- name: cloning the rbenv
+  git: >
+    repo={{ rbenv_url }}
+    dest={{ rbenv_path }}/rbenv/
+
+- name: cloning the ruby-build
+  git: >
+    repo={{ ruby_build_url }}
+    dest={{ rbenv_path }}/rbenv/plugins/ruby-build/
+
+- name: mkdir shims,versions
+  file:
+    path: /usr/local/rbenv/"{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  with_items:
+    - shims
+    - versions
+
+- name: create rbenv group
+  group: name=rbenv state=present
+
+- name: add rbenv group dirs
+  file: path=/usr/local/{{ item }} state=directory owner=root group=rbenv mode=0755
+  with_items:
+    - rbenv
+    - rbenv/plugins/ruby-build
+
+- name: add chmod rbenv dirs
+  file: path=/usr/local/{{ item }} state=directory owner=root group=rbenv mode="g+rwxXs"
+  with_items:
+    - rbenv
+    - rbenv/plugins/ruby-build
+
+- name: copy rbenv.sh
+  copy: src=rbenv.sh dest=/etc/profile.d/
+
+- name: source rbenv.sh
+  shell: /bin/bash -lc "source /etc/profile.d/rbenv.sh"
+  failed_when: False
+  register: source_rbenv_result
+
+- debug: var=source_rbenv_result.failed
+
+- name: check installed the ruby
+  shell: /bin/bash -lc "ruby --version"
+  ignore_errors: True
+  failed_when: False
+  register: is_ruby
+
+- name: install the ruby
+  shell: /bin/bash -lc "rbenv install {{ ruby_version }}"
+  when: is_ruby|failed
+
+- name: global ruby {{ ruby_version }}
+  shell: /bin/bash -lc "rbenv global {{ ruby_version }}"
+  failed_when: False
+  register: global_ruby_result
+
+- debug: var=global_ruby_result.failed
+
+- name: gem update
+  shell: /bin/bash -lc "gem update --system"
+  failed_when: False
+  register: gem_update_result
+
+- debug: var=gem_update_result.failed
+
+- name: install the bundler
+  shell: /bin/bash -lc "gem install bundler"
+  failed_when: False
+  register: install_bundler_result
+
+- debug: var=install_bundler_result.failed
+
+- name: enable sudo gem
+  lineinfile:
+    dest: /etc/sudoers
+    state: present
+    regexp: "^Defaults *secure_path"
+    line: "Defaults secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/rbenv/bin:/usr/local/rbenv/shims"
+  tags:
+    - sudogem

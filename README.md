@@ -1,2 +1,5 @@
-# ansible-ruby
-Ansible ruby role for centos7.
+# Ruby Role
+
+Ansible Ruby role for centos7.
+
+author: okutani
